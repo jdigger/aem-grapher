@@ -1,0 +1,107 @@
+apply plugin: "kotlin"
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+
+apply plugin: 'org.junit.platform.gradle.plugin'
+
+junitPlatform {
+    filters {
+        engines {
+            include 'spek'
+        }
+    }
+}
+
+repositories {
+    maven { url "http://dl.bintray.com/jetbrains/spek" }
+}
+
+dependencies {
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
+    compile "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
+
+    testCompile "org.jetbrains.spek:spek-api:$spek_version", {
+        exclude group: 'org.jetbrains.kotlin'
+    }
+    testRuntime "org.jetbrains.spek:spek-junit-platform-engine:$spek_version", {
+        exclude group: 'org.junit.platform'
+        exclude group: 'org.jetbrains.kotlin'
+    }
+}
+
+idea {
+    project {
+        ipr {
+            withXml { provider ->
+                def codeStyleNode = provider.node.component.find { it.@name == 'ProjectCodeStyleSettingsManager' } ?:
+                    provider.node.appendNode('component', [name: 'ProjectCodeStyleSettingsManager'])
+                def perProjectSetingsNode = codeStyleNode.find { it.@name == "PER_PROJECT_SETTINGS" }.value[0]
+                perProjectSetingsNode.appendNode('option', [name: "JD_P_AT_EMPTY_LINES", value: "false"])
+                perProjectSetingsNode.codeStyleSettings.each {
+                    it.appendNode("option", [name: "FINALLY_ON_NEW_LINE", value: "true"])
+                }
+
+                def koltinCompileNode = provider.node.component.find { it.@name == 'Kotlin2JvmCompilerArguments' } ?:
+                    provider.node.appendNode('component', [name: 'Kotlin2JvmCompilerArguments'])
+                koltinCompileNode.replaceNode {
+                    component(name: 'Kotlin2JvmCompilerArguments') {
+                        option(name: "jvmTarget", value: "1.8")
+                    }
+                }
+            }
+        }
+    }
+}
+
+idea {
+    module {
+        iml {
+            withXml { provider ->
+                def facetNode = provider.node.component.find { it.@name == 'FacetManager' } ?:
+                    provider.node.appendNode('component', [name: 'FacetManager'])
+                def kotlinFactetNode = facetNode.facet.find { it.@type == 'kotlin-language' } ?:
+                    facetNode.appendNode('facet', [type: "kotlin-language", name: "Kotlin"])
+                kotlinFactetNode.replaceNode {
+                    facet(type: "kotlin-language", name: "Kotlin") {
+                        configuration(version: "3", platform: "JVM 1.8", useProjectSettings: "false") {
+                            compilerSettings()
+                            compilerArguments {
+                                option(name: "destination", value: '$MODULE_DIR$/build/classes/kotlin/main')
+                                option(name: "noStdlib", value: "true")
+                                option(name: "noReflect", value: "true")
+                                option(name: "moduleName", value: "file-image-service")
+                                option(name: "jvmTarget", value: "1.8")
+                                option(name: "addCompilerBuiltIns", value: "true")
+                                option(name: "loadBuiltInsFromDependencies", value: "true")
+                                option(name: "languageVersion", value: "1.1")
+                                option(name: "apiVersion", value: "1.1")
+                                option(name: "version", value: "true")
+                                option(name: "pluginClasspaths") {
+                                    array {
+                                        option(value: '$KOTLIN_BUNDLED$/lib/allopen-compiler-plugin.jar')
+                                    }
+                                }
+                                option(name: "pluginOptions") {
+                                    array {
+                                        option(value: "plugin:org.jetbrains.kotlin.allopen:annotation=")
+                                        option(value: "plugin:org.jetbrains.kotlin.allopen:annotation=org.springframework.stereotype.Component")
+                                        option(value: "plugin:org.jetbrains.kotlin.allopen:annotation=org.springframework.transaction.annotation.Transactional")
+                                        option(value: "plugin:org.jetbrains.kotlin.allopen:annotation=org.springframework.scheduling.annotation.Async")
+                                        option(value: "plugin:org.jetbrains.kotlin.allopen:annotation=org.springframework.cache.annotation.Cacheable")
+                                        option(value: "plugin:org.jetbrains.kotlin.allopen:annotation=org.springframework.boot.test.context.SpringBootTest")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
