@@ -33,7 +33,13 @@ wrapper {
 }
 
 dependencies {
-	testCompile "org.junit.jupiter:junit-jupiter-api:${junit_version}"
+    compile "commons-io:commons-io:2.4"
+
+    testCompile "org.junit.jupiter:junit-jupiter-api:${junit_version}"
 	testRuntime "org.junit.jupiter:junit-jupiter-engine:${junit_version}"
 	testRuntime "ch.qos.logback:logback-classic:1.1.7"
+
+    // in-memory filesystem
+    testCompile "com.google.jimfs:jimfs:1.1"
+
 }
