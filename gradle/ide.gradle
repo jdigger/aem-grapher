@@ -1,0 +1,109 @@
+apply plugin: 'idea'
+apply plugin: 'eclipse'
+
+if (project == project.rootProject) {
+    idea.project.ipr {
+        withXml { provider ->
+            def vcsMapping = provider.node.component.find { it.@name == 'VcsDirectoryMappings' }.mapping
+            vcsMapping.@directory = '$PROJECT_DIR$'
+            vcsMapping.@vcs = 'Git'
+
+            setupKotlinTarget(provider)
+
+            def codeStyleNode = provider.node.component.find { it.@name == 'ProjectCodeStyleSettingsManager' }
+            if (codeStyleNode == null) {
+                codeStyleNode = provider.node.appendNode('component', [name: 'ProjectCodeStyleSettingsManager'])
+            }
+            codeStyleNode.replaceNode { node ->
+                component(name: 'ProjectCodeStyleSettingsManager') {
+                    option(name: "PER_PROJECT_SETTINGS") {
+                        value {
+                            option(name: "OTHER_INDENT_OPTIONS") {
+                                value {
+                                    option(name: "INDENT_SIZE", value: "4")
+                                    option(name: "CONTINUATION_INDENT_SIZE", value: "4")
+                                    option(name: "TAB_SIZE", value: "4")
+                                    option(name: "USE_TAB_CHARACTER", value: "false")
+                                    option(name: "SMART_TABS", value: "false")
+                                    option(name: "LABEL_INDENT_SIZE", value: "0")
+                                    option(name: "LABEL_INDENT_ABSOLUTE", value: "false")
+                                    option(name: "USE_RELATIVE_INDENTS", value: "false")
+                                }
+                            }
+                            option(name: "CLASS_COUNT_TO_USE_IMPORT_ON_DEMAND", value: "${Integer.MAX_VALUE}")
+                            option(name: "NAMES_COUNT_TO_USE_IMPORT_ON_DEMAND", value: "${Integer.MAX_VALUE}")
+                            XML {
+                                option(name: "XML_LEGACY_SETTINGS_IMPORTED", value: "true")
+                            }
+
+                            // this is needed in addition to the one below, for import settings
+                            GroovyCodeStyleSettings {
+                                option(name: "CLASS_COUNT_TO_USE_IMPORT_ON_DEMAND", value: "${Integer.MAX_VALUE}")
+                                option(name: "NAMES_COUNT_TO_USE_IMPORT_ON_DEMAND", value: "${Integer.MAX_VALUE}")
+                            }
+                            JetCodeStyleSettings {
+                                option(name: "NAME_COUNT_TO_USE_STAR_IMPORT", value: "${Integer.MAX_VALUE}")
+                                option(name: "NAME_COUNT_TO_USE_STAR_IMPORT_FOR_MEMBERS", value: "${Integer.MAX_VALUE}")
+                            }
+
+                            // oddly, both "JAVA" and "Java" are used...
+                            ['Groovy', 'JAVA', 'Java', 'Scala', "kotlin"].each {
+                                codeStyleSettings(language: it) {
+                                    option(name: "CLASS_COUNT_TO_USE_IMPORT_ON_DEMAND", value: "${Integer.MAX_VALUE}")
+                                    option(name: "NAMES_COUNT_TO_USE_IMPORT_ON_DEMAND", value: "${Integer.MAX_VALUE}")
+                                    option(name: "BLANK_LINES_AROUND_METHOD", value: "2")
+                                    //option(name: "BLANK_LINES_BEFORE_METHOD_BODY", value: "1")
+                                    option(name: "ELSE_ON_NEW_LINE", value: "true")
+                                    option(name: "CATCH_ON_NEW_LINE", value: "true")
+                                    option(name: "FINALLY_ON_NEW_LINE", value: "true")
+                                    option(name: "SPACE_AFTER_TYPE_CAST", value: "false")
+                                    option(name: "INDENT_SIZE", value: "2")
+                                    option(name: "TAB_SIZE", value: "4")
+
+                                    // both this level and 'indentOptions' are used
+                                    option(name: "CONTINUATION_INDENT_SIZE", value: "4")
+                                    indentOptions {
+                                        option(name: "CONTINUATION_INDENT_SIZE", value: "4")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    option(name: "USE_PER_PROJECT_SETTINGS", value: "true")
+                }
+            }
+        }
+    }
+
+    // Gradle is handling the IDE files, so don't offer to link Gradle to the project
+    idea.workspace.iws.withXml { provider ->
+        provider.node.
+            component.find { it.@name == 'PropertiesComponent' }.
+                appendNode('property', [name: 'show.inlinked.gradle.project.popup', value: "false"])
+    }
+}
+
+
+private static void setupKotlinTarget(provider) {
+    def kotlinCompilerNode = provider.node.component.find { it.@name == 'Kotlin2JvmCompilerArguments' }
+    if (kotlinCompilerNode == null) {
+        kotlinCompilerNode = provider.node.appendNode('component', [name: 'Kotlin2JvmCompilerArguments'])
+    }
+    def kotlinJvmTargetNode = kotlinCompilerNode.option.find { it.@name == "jvmTarget" }
+    if (kotlinJvmTargetNode == null) {
+        kotlinCompilerNode.appendNode('option', [name: "jvmTarget", value: "1.8"])
+    }
+    else {
+        kotlinJvmTargetNode.@value = "1.8"
+    }
+}
+
+// http://forums.gradle.org/gradle/topics/classpath_order_generated_by_eclipse_plugin_causes_problems
+plugins.withId('java') {
+    eclipse.classpath.file.whenMerged { classpath ->
+        def projectRefs = classpath.entries.findAll { entry -> entry.kind == 'src' && entry.path.startsWith('/') }
+        //move the project references to the end of the list:
+        classpath.entries.removeAll(projectRefs)
+        classpath.entries.addAll(projectRefs)
+    }
+}
